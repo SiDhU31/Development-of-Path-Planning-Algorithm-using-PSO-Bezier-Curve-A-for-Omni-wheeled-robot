@@ -13,7 +13,7 @@ robot_radius = 0.15
 imu_drift_per_sec = np.deg2rad(1)
 wheel_angles = np.deg2rad([0, 120, 240])
 
-# input your way points
+# input your way pointss
 
 waypoints = np.array([
     [2.00, 2.00],
