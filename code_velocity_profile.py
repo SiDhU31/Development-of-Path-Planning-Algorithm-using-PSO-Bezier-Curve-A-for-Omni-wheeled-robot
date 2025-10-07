@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
 # Robot and motion settings
-wheel_radius = 0.05
+wheel_radius = 0.05 #input parameters
 wheel_angles = np.deg2rad([0, 120, 240])  # Angles for three wheels
 
 waypoints = np.array([
