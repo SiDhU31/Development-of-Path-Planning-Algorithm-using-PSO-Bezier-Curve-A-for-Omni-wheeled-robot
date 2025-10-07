@@ -1,0 +1,192 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+
+# Robot and motion settings
+wheel_radius = 0.05
+wheel_angles = np.deg2rad([0, 120, 240])  # Angles for three wheels
+
+waypoints = np.array([
+    [2.00, 2.00],
+    [2.21, 2.96],
+    [2.43, 3.85],
+    [2.66, 4.68],
+    [2.90, 5.45],
+    [3.15, 6.19],
+    [3.42, 6.90],
+    [3.69, 7.59],
+    [3.98, 8.27],
+    [4.28, 8.95],
+    [4.60, 9.64],
+    [4.92, 10.33],
+    [5.26, 11.04],
+    [5.61, 11.78],
+    [5.98, 12.53],
+    [6.35, 13.32],
+    [6.74, 14.13],
+    [7.14, 14.98],
+    [7.55, 15.86],
+    [7.97, 16.77],
+    [8.40, 17.72],
+    [8.84, 18.70],
+    [9.28, 19.72],
+    [9.74, 20.77],
+    [10.17, 21.86],
+    [10.47, 23.03],
+    [10.93, 24.21],
+    [11.54, 25.34],
+    [12.15, 26.46],
+    [12.65, 27.68],
+    [13.15, 28.91],
+    [13.66, 30.17],
+    [14.18, 31.43],
+    [14.70, 32.71],
+    [15.23, 34.00],
+    [15.76, 35.30],
+    [16.29, 36.60],
+    [16.83, 37.90],
+    [17.38, 39.20],
+    [17.93, 40.50],
+    [18.49, 41.79],
+    [19.05, 43.08],
+    [19.62, 44.35],
+    [20.20, 45.62],
+    [20.78, 46.86],
+    [21.38, 48.10],
+    [21.98, 49.31],
+    [22.60, 50.51],
+    [23.23, 51.69],
+    [23.88, 52.85],
+    [24.54, 53.99],
+    [25.22, 55.10],
+    [25.92, 56.20],
+    [26.64, 57.27],
+    [27.38, 58.32],
+    [28.15, 59.35],
+    [28.95, 60.36],
+    [29.77, 61.35],
+    [30.29, 62.41],
+    [30.67, 63.61],
+    [31.27, 64.88],
+    [32.12, 66.16],
+    [33.23, 67.36],
+    [34.55, 68.38],
+    [36.00, 69.17],
+    [37.48, 69.68],
+    [38.88, 69.94],
+    [40.16, 70.47],
+    [41.46, 71.34],
+    [42.81, 72.21],
+    [44.22, 73.08],
+    [45.69, 73.96],
+    [47.21, 74.84],
+    [48.78, 75.73],
+    [50.42, 76.63],
+    [52.11, 77.54],
+    [53.86, 78.45],
+    [55.66, 79.38],
+    [57.51, 80.32],
+    [59.41, 81.27],
+    [61.35, 82.22],
+    [63.34, 83.19],
+    [65.36, 84.15],
+    [67.42, 85.13],
+    [69.49, 86.10],
+    [71.59, 87.06],
+    [73.68, 88.02],
+    [75.73, 89.04],
+    [77.86, 89.87],
+    [79.91, 90.75],
+    [81.92, 91.59],
+    [83.87, 92.37],
+    [85.75, 93.09],
+    [87.54, 93.74],
+    [89.21, 94.29],
+    [90.74, 94.73],
+    [92.12, 95.04],
+    [93.30, 95.21],
+    [94.28, 95.20],
+    [95.00, 95.00]
+])
+
+
+dt = 0.1
+speed = 0.5  # Constant speed in m/s
+
+# Precompute smooth path using interpolation
+t_points = np.arange(len(waypoints))
+interp_x = interp1d(t_points, waypoints[:, 0], kind='cubic')
+interp_y = interp1d(t_points, waypoints[:, 1], kind='cubic')
+
+# Estimate path length
+def compute_path_length(x, y):
+    distances = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
+    return np.sum(distances)
+
+# Generate fine points for path length calculation
+t_fine = np.linspace(0, len(waypoints) - 1, 200)
+x_fine = interp_x(t_fine)
+y_fine = interp_y(t_fine)
+total_length = compute_path_length(x_fine, y_fine)
+total_time = total_length / speed
+num_steps = int(total_time / dt) + 1
+
+# Precompute positions and velocities
+t_path = np.linspace(0, len(waypoints) - 1, num_steps)
+path_x = interp_x(t_path)
+path_y = interp_y(t_path)
+
+# Lists to store velocities
+wheel1_velocities = []
+wheel2_velocities = []
+wheel3_velocities = []
+time_steps = []
+
+# Calculate velocities
+robot_vel = np.zeros(2)
+for frame in range(num_steps):
+    if frame > 0:
+        dx = path_x[frame] - path_x[frame - 1]
+        dy = path_y[frame] - path_y[frame - 1]
+        robot_vel[:] = [dx / dt, dy / dt]
+        velocity_mag = np.linalg.norm(robot_vel)
+        if velocity_mag > 0:
+            robot_vel *= speed / velocity_mag  # Normalize to constant speed
+    else:
+        robot_vel[:] = [0, 0]  # No velocity at start
+
+    # Calculate wheel velocities
+    v_x, v_y = robot_vel
+    wheel_vels = []
+    for alpha in wheel_angles:
+        w = (np.cos(alpha) * v_x + np.sin(alpha) * v_y) / wheel_radius
+        linear_vel = w * wheel_radius
+        wheel_vels.append(linear_vel)
+
+    # Store velocities
+    wheel1_velocities.append(wheel_vels[0])
+    wheel2_velocities.append(wheel_vels[1])
+    wheel3_velocities.append(wheel_vels[2])
+    time_steps.append(frame * dt)
+
+# Plot velocity profiles
+fig, axs = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
+
+axs[0].plot(time_steps, wheel1_velocities, label='Wheel 1', color='r')
+axs[0].set_ylabel('Velocity (m/s)')
+axs[0].legend(loc='upper right')
+axs[0].grid(True)
+
+axs[1].plot(time_steps, wheel2_velocities, label='Wheel 2', color='g')
+axs[1].set_ylabel('Velocity (m/s)')
+axs[1].legend(loc='upper right')
+axs[1].grid(True)
+
+axs[2].plot(time_steps, wheel3_velocities, label='Wheel 3', color='b')
+axs[2].set_xlabel('Time (s)')
+axs[2].set_ylabel('Velocity (m/s)')
+axs[2].legend(loc='upper right')
+axs[2].grid(True)
+
+plt.tight_layout()
+plt.show()
